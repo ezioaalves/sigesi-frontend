@@ -6,24 +6,82 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Building2, FileText, User, Upload, X } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { createSolicitacao } from "@/services/solicitacoes";
+import { apiFetch } from "@/lib/api";
+
+// OAuth popup helper is defined inside the component so it can use hooks like `useToast`.
 
 const Portal = () => {
   const { toast } = useToast();
-  const [isAuthenticated] = useState(true); // Mock - would use Gov.br auth
+  const BACKEND_OAUTH_PATH = import.meta.env.VITE_API_BASE
+    ? `${import.meta.env.VITE_API_BASE}/oauth2/authorization/google`
+    : "/oauth2/authorization/google";
+
+  const loginWithPopup = () => {
+    const popup = window.open(BACKEND_OAUTH_PATH, "oauth", "width=600,height=700");
+    if (!popup) {
+      toast({ title: "Erro", description: "Não foi possível abrir janela de login.", variant: "destructive" });
+      return;
+    }
+
+    const start = Date.now();
+    const timeout = 2 * 60 * 1000; // 2 minutes
+
+    const check = async () => {
+      try {
+        // We only care whether the endpoint responds without redirect/500.
+        await apiFetch("/api/solicitacoes/");
+        try { popup.close(); } catch { }
+        toast({ title: "Logado", description: "Login concluído com sucesso." });
+        clearInterval(interval);
+      } catch (err: any) {
+        // If server responds 500 or unauthenticated, keep polling until popup closes or timeout.
+        if (popup.closed) {
+          clearInterval(interval);
+          toast({ title: "Login cancelado", description: "Janela de login foi fechada." });
+        } else if (Date.now() - start > timeout) {
+          clearInterval(interval);
+          try { popup.close(); } catch { }
+          toast({ title: "Tempo esgotado", description: "Login não foi concluído a tempo.", variant: "destructive" });
+        } else {
+          // Optional: log error detail for debugging (do not spam user)
+          console.debug("login check error", err?.status, err?.responseBody);
+        }
+      }
+    };
+
+    const interval = setInterval(check, 1500);
+  };
+
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    apiFetch("/api/usuarios/me")
+      .then((data) => {
+        if (data && data.id) {
+          setIsAuthenticated(true);
+          setUser(data);
+        }
+      })
+      .catch(() => setIsAuthenticated(false));
+  }, []);
+
   const [formData, setFormData] = useState({
     title: "",
     category: "",
     description: "",
     address: "",
   });
+  const [submitting, setSubmitting] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newFiles = Array.from(e.target.files || []);
     const validFiles = newFiles.filter(file => file.size <= 5 * 1024 * 1024); // 5MB limit
-    
+
     if (validFiles.length !== newFiles.length) {
       toast({
         title: "Alguns arquivos foram ignorados",
@@ -31,7 +89,7 @@ const Portal = () => {
         variant: "destructive",
       });
     }
-    
+
     setFiles(prev => [...prev, ...validFiles].slice(0, 10));
   };
 
@@ -39,15 +97,36 @@ const Portal = () => {
     setFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, this would send to the backend
-    toast({
-      title: "Solicitação enviada com sucesso!",
-      description: "Você receberá atualizações sobre o andamento da sua solicitação.",
-    });
-    setFormData({ title: "", category: "", description: "", address: "" });
-    setFiles([]);
+    setSubmitting(true);
+    try {
+      const dto = {
+        assunto: formData.title,
+        body: formData.description,
+        anexoId: null,
+        autorId: user?.id, // Real authenticated user id
+        localId: 1, // TODO: map address to an existing local id
+      };
+
+      console.debug("createSolicitacao dto:", dto);
+      await createSolicitacao(dto);
+
+      toast({
+        title: "Solicitação enviada com sucesso!",
+        description: "Você receberá atualizações sobre o andamento da sua solicitação.",
+      });
+      setFormData({ title: "", category: "", description: "", address: "" });
+      setFiles([]);
+    } catch (err: any) {
+      toast({
+        title: "Erro ao enviar solicitação",
+        description: err?.message || "Verifique sua conexão e tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (!isAuthenticated) {
@@ -85,6 +164,9 @@ const Portal = () => {
               Minhas Solicitações
             </Button>
           </Link>
+          <Button variant="ghost" size="sm" onClick={loginWithPopup} className="ml-2">
+            Entrar (Google)
+          </Button>
         </div>
       </header>
 
@@ -186,8 +268,8 @@ const Portal = () => {
               </div>
 
               <div className="flex gap-3 pt-4">
-                <Button type="submit" className="flex-1" size="lg">
-                  Enviar Solicitação
+                <Button type="submit" className="flex-1" size="lg" disabled={submitting}>
+                  {submitting ? "Enviando..." : "Enviar Solicitação"}
                 </Button>
                 <Link to="/" className="flex-1">
                   <Button type="button" variant="outline" className="w-full" size="lg">

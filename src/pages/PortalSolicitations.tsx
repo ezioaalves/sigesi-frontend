@@ -6,6 +6,9 @@ import { ArrowLeft, FileText } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 
+import { getSolicitacoes } from "@/services/solicitacoes";
+import { useEffect } from "react";
+
 interface Solicitation {
   id: number;
   number: string;
@@ -17,26 +20,23 @@ interface Solicitation {
 
 const PortalSolicitations = () => {
   const [selectedSolicitation, setSelectedSolicitation] = useState<Solicitation | null>(null);
-  
-  // Mock data - in a real app, filtered by logged-in citizen
-  const mySolicitations: Solicitation[] = [
-    {
-      id: 1,
-      number: "SOL-2025-042",
-      title: "Reparo de calçada - Rua Principal",
-      description: "Solicitação de reparo de calçada na Rua Principal, nº 123.",
-      date: "10/01/2025",
-      status: "in-progress",
-    },
-    {
-      id: 2,
-      number: "SOL-2025-038",
-      title: "Iluminação pública - Praça Central",
-      description: "Postes de iluminação apagados na Praça Central.",
-      date: "08/01/2025",
-      status: "in-progress",
-    },
-  ];
+  const [mySolicitations, setMySolicitations] = useState<Solicitation[]>([]);
+
+  useEffect(() => {
+    getSolicitacoes()
+      .then((data: any[]) => {
+        const mapped = data.map((item) => ({
+          id: item.id,
+          number: `SOL-${new Date(item.data).getFullYear()}-${String(item.id).padStart(3, "0")}`,
+          title: item.assunto,
+          description: item.body,
+          date: new Date(item.data).toLocaleDateString("pt-BR"),
+          status: "in-progress" as const,
+        }));
+        setMySolicitations(mapped);
+      })
+      .catch((err) => console.error("Failed to fetch solicitations", err));
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
@@ -143,7 +143,7 @@ const PortalSolicitations = () => {
         <div className="mt-8 p-4 bg-muted rounded-lg">
           <h3 className="font-semibold mb-2">Sobre o Status</h3>
           <p className="text-sm text-muted-foreground">
-            Quando sua solicitação estiver "Em Andamento", significa que nossa equipe já recebeu e está trabalhando 
+            Quando sua solicitação estiver "Em Andamento", significa que nossa equipe já recebeu e está trabalhando
             para resolver sua demanda. Você será notificado quando houver atualizações importantes.
           </p>
         </div>

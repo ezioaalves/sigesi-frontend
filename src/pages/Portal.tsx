@@ -1,292 +1,182 @@
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, FileText, User, Upload, X } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ArrowLeft, FileText } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { useToast } from "@/hooks/use-toast";
-import { createSolicitacao } from "@/services/solicitacoes";
-import { apiFetch } from "@/lib/api";
 
-// OAuth popup helper is defined inside the component so it can use hooks like `useToast`.
+import { getSolicitacoes } from "@/services/solicitacoes";
+import { Solicitacao, SolicitacaoStatus } from "@/types";
 
-const Portal = () => {
-  const { toast } = useToast();
-  const BACKEND_OAUTH_PATH = import.meta.env.VITE_API_BASE
-    ? `${import.meta.env.VITE_API_BASE}/oauth2/authorization/google`
-    : "/oauth2/authorization/google";
+const getStatusConfig = (status: SolicitacaoStatus) => {
+  switch (status) {
+    case SolicitacaoStatus.ABERTA:
+      return { label: "Aberta", className: "bg-status-pending text-white" };
+    case SolicitacaoStatus.EM_ANALISE:
+      return { label: "Em Análise", className: "bg-status-pending text-white" };
+    case SolicitacaoStatus.EM_ANDAMENTO:
+      return { label: "Em Andamento", className: "bg-status-inProgress text-white" };
+    case SolicitacaoStatus.CONCLUIDA:
+      return { label: "Concluída", className: "bg-status-completed text-white" };
+    case SolicitacaoStatus.ENCERRADA:
+      return { label: "Encerrada", className: "bg-status-completed text-white" };
+    case SolicitacaoStatus.REJEITADA:
+      return { label: "Rejeitada", className: "bg-destructive text-white" };
+    default:
+      return { label: "Desconhecido", className: "bg-muted text-muted-foreground" };
+  }
+};
 
-  const loginWithPopup = () => {
-    const popup = window.open(BACKEND_OAUTH_PATH, "oauth", "width=600,height=700");
-    if (!popup) {
-      toast({ title: "Erro", description: "Não foi possível abrir janela de login.", variant: "destructive" });
-      return;
-    }
-
-    const start = Date.now();
-    const timeout = 2 * 60 * 1000; // 2 minutes
-
-    const check = async () => {
-      try {
-        // We only care whether the endpoint responds without redirect/500.
-        await apiFetch("/api/solicitacoes/");
-        try { popup.close(); } catch { }
-        toast({ title: "Logado", description: "Login concluído com sucesso." });
-        clearInterval(interval);
-      } catch (err: any) {
-        // If server responds 500 or unauthenticated, keep polling until popup closes or timeout.
-        if (popup.closed) {
-          clearInterval(interval);
-          toast({ title: "Login cancelado", description: "Janela de login foi fechada." });
-        } else if (Date.now() - start > timeout) {
-          clearInterval(interval);
-          try { popup.close(); } catch { }
-          toast({ title: "Tempo esgotado", description: "Login não foi concluído a tempo.", variant: "destructive" });
-        } else {
-          // Optional: log error detail for debugging (do not spam user)
-          console.debug("login check error", err?.status, err?.responseBody);
-        }
-      }
-    };
-
-    const interval = setInterval(check, 1500);
-  };
-
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState<any>(null);
+const PortalSolicitations = () => {
+  const [selectedSolicitation, setSelectedSolicitation] = useState<Solicitacao | null>(null);
+  const [mySolicitations, setMySolicitations] = useState<Solicitacao[]>([]);
 
   useEffect(() => {
-    apiFetch("/api/usuarios/me")
+    getSolicitacoes()
       .then((data) => {
-        if (data && data.id) {
-          setIsAuthenticated(true);
-          setUser(data);
-        }
+        // Mapeamento defensivo: se o backend não enviar status, assume ABERTA
+        const mapped = data.map((item) => ({
+          ...item,
+          status: item.status || SolicitacaoStatus.ABERTA,
+        }));
+        setMySolicitations(mapped);
       })
-      .catch(() => setIsAuthenticated(false));
+      .catch((err) => console.error("Failed to fetch solicitations", err));
   }, []);
-
-  const [formData, setFormData] = useState({
-    title: "",
-    category: "",
-    description: "",
-    address: "",
-  });
-  const [submitting, setSubmitting] = useState(false);
-  const [files, setFiles] = useState<File[]>([]);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newFiles = Array.from(e.target.files || []);
-    const validFiles = newFiles.filter(file => file.size <= 5 * 1024 * 1024); // 5MB limit
-
-    if (validFiles.length !== newFiles.length) {
-      toast({
-        title: "Alguns arquivos foram ignorados",
-        description: "O tamanho máximo por arquivo é 5MB",
-        variant: "destructive",
-      });
-    }
-
-    setFiles(prev => [...prev, ...validFiles].slice(0, 10));
-  };
-
-  const removeFile = (index: number) => {
-    setFiles(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      const dto = {
-        assunto: formData.title,
-        body: formData.description,
-        anexoId: null,
-        autorId: user?.id, // Real authenticated user id
-        localId: 1, // TODO: map address to an existing local id
-      };
-
-      console.debug("createSolicitacao dto:", dto);
-      await createSolicitacao(dto);
-
-      toast({
-        title: "Solicitação enviada com sucesso!",
-        description: "Você receberá atualizações sobre o andamento da sua solicitação.",
-      });
-      setFormData({ title: "", category: "", description: "", address: "" });
-      setFiles([]);
-    } catch (err: any) {
-      toast({
-        title: "Erro ao enviar solicitação",
-        description: err?.message || "Verifique sua conexão e tente novamente.",
-        variant: "destructive",
-      });
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4">
-        <Card className="max-w-md w-full">
-          <CardHeader className="text-center">
-            <Building2 className="w-12 h-12 mx-auto text-primary mb-4" />
-            <CardTitle>Portal do Cidadão</CardTitle>
-            <CardDescription>
-              Faça login com sua conta Gov.br para enviar solicitações
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button className="w-full" size="lg">
-              Entrar com Gov.br
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
       <header className="bg-primary text-primary-foreground p-4 shadow-md">
-        <div className="container mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Portal do Cidadão</h1>
-            <p className="text-sm opacity-90">SEINFRA - Sistema de Solicitações</p>
-          </div>
-          <Link to="/portal/solicitations">
-            <Button variant="secondary" size="sm" className="gap-2">
-              <User className="w-4 h-4" />
-              Minhas Solicitações
+        <div className="container mx-auto">
+          <Link to="/portal">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-primary-foreground hover:bg-primary/90 mb-2"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Voltar
             </Button>
           </Link>
-          <Button variant="ghost" size="sm" onClick={loginWithPopup} className="ml-2">
-            Entrar (Google)
-          </Button>
+          <h1 className="text-2xl font-bold">Minhas Solicitações</h1>
+          <p className="text-sm opacity-90">Acompanhe o status das suas solicitações</p>
         </div>
       </header>
 
-      <div className="container mx-auto p-6 max-w-3xl">
-        <Card className="animate-fade-in">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <FileText className="w-8 h-8 text-primary" />
-              <div>
-                <CardTitle className="text-2xl">Nova Solicitação</CardTitle>
-                <CardDescription>
-                  Preencha o formulário abaixo para enviar sua solicitação à SEINFRA
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="title">Assunto da Solicitação</Label>
-                <Input
-                  id="title"
-                  placeholder="Ex: Reparo de calçada, iluminação pública..."
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="category">Categoria</Label>
-                <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })} required>
-                  <SelectTrigger id="category">
-                    <SelectValue placeholder="Selecione uma categoria" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="iluminacao">Iluminação</SelectItem>
-                    <SelectItem value="esgoto">Esgoto</SelectItem>
-                    <SelectItem value="buraco">Buraco na via</SelectItem>
-                    <SelectItem value="calcada">Calçada</SelectItem>
-                    <SelectItem value="limpeza">Limpeza urbana</SelectItem>
-                    <SelectItem value="outros">Outros</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="description">Descrição Detalhada</Label>
-                <Textarea
-                  id="description"
-                  placeholder="Descreva sua solicitação com o máximo de detalhes possível..."
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={6}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="address">Endereço/Local</Label>
-                <Input
-                  id="address"
-                  placeholder="Rua, número, bairro..."
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Anexar Arquivos (Opcional)</Label>
-                <p className="text-xs text-muted-foreground">Máximo 5MB por arquivo, até 10 arquivos</p>
-                <div className="space-y-2">
-                  {files.map((file, index) => (
-                    <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded-md">
-                      <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                      <span className="text-sm flex-1 truncate">{file.name}</span>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">{(file.size / 1024).toFixed(1)}KB</span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeFile(index)}
-                        className="flex-shrink-0"
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
+      <div className="container mx-auto p-6 max-w-4xl">
+        <div className="space-y-4">
+          {mySolicitations.map((solicitation) => {
+            const statusConfig = getStatusConfig(solicitation.status!);
+            const solicitationNumber = `SOL-${new Date(solicitation.data).getFullYear()}-${String(solicitation.id).padStart(3, "0")}`;
+            
+            return (
+              <Card key={solicitation.id} className="animate-fade-in">
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <FileText className="w-5 h-5 text-primary" />
+                        <span className="font-mono text-sm text-muted-foreground">
+                          {solicitationNumber}
+                        </span>
+                      </div>
+                      <CardTitle className="text-lg">{solicitation.assunto}</CardTitle>
                     </div>
-                  ))}
-                  {files.length < 10 && (
-                    <Input
-                      type="file"
-                      onChange={handleFileChange}
-                      className="cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
-                      accept="image/*,.pdf,.doc,.docx"
-                    />
-                  )}
-                </div>
-              </div>
+                    <Badge className={statusConfig.className}>
+                      {statusConfig.label}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-4">{solicitation.body}</p>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      Enviado em: {new Date(solicitation.data).toLocaleDateString("pt-BR")}
+                    </span>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm" onClick={() => setSelectedSolicitation(solicitation)}>
+                          Ver Detalhes
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2">
+                            <FileText className="w-5 h-5 text-primary" />
+                            {selectedSolicitation?.assunto}
+                          </DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div>
+                            <p className="text-sm font-semibold text-muted-foreground mb-1">Número da Solicitação</p>
+                            <p className="font-mono">
+                              {selectedSolicitation && `SOL-${new Date(selectedSolicitation.data).getFullYear()}-${String(selectedSolicitation.id).padStart(3, "0")}`}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-muted-foreground mb-1">Status</p>
+                            {selectedSolicitation && (
+                              <Badge className={getStatusConfig(selectedSolicitation.status!).className}>
+                                {getStatusConfig(selectedSolicitation.status!).label}
+                              </Badge>
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-muted-foreground mb-1">Descrição</p>
+                            <p className="text-sm">{selectedSolicitation?.body}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-muted-foreground mb-1">Local</p>
+                            <p className="text-sm">
+                              {selectedSolicitation?.local.logradouro}, {selectedSolicitation?.local.numero} - {selectedSolicitation?.local.bairro}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-muted-foreground mb-1">Data de Envio</p>
+                            <p className="text-sm">
+                              {selectedSolicitation && new Date(selectedSolicitation.data).toLocaleDateString("pt-BR")}
+                            </p>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
 
-              <div className="flex gap-3 pt-4">
-                <Button type="submit" className="flex-1" size="lg" disabled={submitting}>
-                  {submitting ? "Enviando..." : "Enviar Solicitação"}
-                </Button>
-                <Link to="/" className="flex-1">
-                  <Button type="button" variant="outline" className="w-full" size="lg">
-                    Cancelar
+          {mySolicitations.length === 0 && (
+            <Card>
+              <CardContent className="text-center py-12">
+                <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground mb-2">Você ainda não possui solicitações</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Não possui cadastro?{" "}
+                  <Link to="/signup" className="text-primary hover:underline font-semibold">
+                    Cadastre-se aqui
+                  </Link>
+                </p>
+                <Link to="/portal">
+                  <Button className="mt-4">
+                    Enviar Nova Solicitação
                   </Button>
                 </Link>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          )}
+        </div>
 
-        <div className="mt-6 text-center text-sm text-muted-foreground">
-          <p>Suas informações são protegidas pela Lei Geral de Proteção de Dados (LGPD)</p>
+        <div className="mt-8 p-4 bg-muted rounded-lg">
+          <h3 className="font-semibold mb-2">Sobre o Status</h3>
+          <p className="text-sm text-muted-foreground">
+            Acompanhe o progresso do seu pedido através das cores e etiquetas. Se tiver dúvidas, entre em contato com a secretaria.
+          </p>
         </div>
       </div>
     </div>
   );
 };
 
-export default Portal;
+export default PortalSolicitations;

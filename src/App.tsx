@@ -10,8 +10,8 @@ import Demands from "./pages/Demands";
 import Cemetery from "./pages/Cemetery";
 import Users from "./pages/Users";
 import Agent from "./pages/Agent";
+import Solicitation from "./pages/Solicitation";
 import Portal from "./pages/Portal";
-import PortalSolicitations from "./pages/PortalSolicitations";
 import Auth from "./pages/Auth";
 import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
@@ -28,13 +28,13 @@ const App = () => (
           <Route path="/" element={<Auth />} />
           <Route path="/index" element={<Index />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/documents" element={<Documents />} />
-          <Route path="/demands" element={<Demands />} />
-          <Route path="/cemetery" element={<Cemetery />} />
-          <Route path="/users" element={<Users />} />
-          <Route path="/agent" element={<Agent />} />
+          <Route path="/documentos" element={<Documents />} />
+          <Route path="/demandas" element={<Demands />} />
+          <Route path="/cemeterio" element={<Cemetery />} />
+          <Route path="/usuarios" element={<Users />} />
+          <Route path="/agente" element={<Agent />} />
           <Route path="/portal" element={<Portal />} />
-          <Route path="/portal/solicitations" element={<PortalSolicitations />} />
+          <Route path="/solicitacao" element={<Solicitation />} />
           <Route path="/signup" element={<Signup />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

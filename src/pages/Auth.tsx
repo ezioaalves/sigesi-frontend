@@ -12,8 +12,8 @@ const Auth = () => {
   const role = searchParams.get("role");
 
   const handleLogin = () => {
-    // Redirect to the backend's Google OAuth2 endpoint
-    window.location.href = 'http://localhost:8080/oauth2/authorization/google';
+    // Redireciona via proxy para evitar problemas de CORS e garantir compartilhamento de cookies
+    window.location.href = '/oauth2/authorization/google';
   };
 
   const getTitle = () => {

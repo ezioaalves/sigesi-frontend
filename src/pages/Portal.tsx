@@ -2,19 +2,19 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ArrowLeft, FileText } from "lucide-react";
+import { FileText, LayoutDashboard } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { useUser } from "@/hooks/use-user";
 
 import { getSolicitacoes } from "@/services/solicitacoes";
 import { Solicitacao, SolicitacaoStatus } from "@/types";
 
+// Função para mapear status para rótulos e classes CSS
 const getStatusConfig = (status: SolicitacaoStatus) => {
   switch (status) {
     case SolicitacaoStatus.ABERTA:
       return { label: "Aberta", className: "bg-status-pending text-white" };
-    case SolicitacaoStatus.EM_ANALISE:
-      return { label: "Em Análise", className: "bg-status-pending text-white" };
     case SolicitacaoStatus.EM_ANDAMENTO:
       return { label: "Em Andamento", className: "bg-status-inProgress text-white" };
     case SolicitacaoStatus.CONCLUIDA:
@@ -28,9 +28,36 @@ const getStatusConfig = (status: SolicitacaoStatus) => {
   }
 };
 
-const PortalSolicitations = () => {
+
+import { LogOut } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { logoutUser } from "@/services/usuarios";
+
+const Portal = () => {
+  const { data: user } = useUser();
+  const queryClient = useQueryClient();
+
+  // Estado para armazenar as solicitações do usuário
   const [selectedSolicitation, setSelectedSolicitation] = useState<Solicitacao | null>(null);
+  // Estado para armazenar as solicitações do usuário
   const [mySolicitations, setMySolicitations] = useState<Solicitacao[]>([]);
+
+  const handleLogout = async () => {
+    try {
+      await logoutUser();
+    } catch (error) {
+      console.error("Logout failed", error);
+    } finally {
+      // Invalidate queries and redirect regardless of backend success
+      queryClient.invalidateQueries({ queryKey: ["user"] });
+      window.location.href = "/";
+    }
+  };
+
+  const getServerAreaPath = (role: string) => {
+    if (role === "AGENTE") return "/agente";
+    return "/dashboard";
+  };
 
   useEffect(() => {
     getSolicitacoes()
@@ -40,6 +67,7 @@ const PortalSolicitations = () => {
           ...item,
           status: item.status || SolicitacaoStatus.ABERTA,
         }));
+        // Filtra apenas as solicitações do usuário atual
         setMySolicitations(mapped);
       })
       .catch((err) => console.error("Failed to fetch solicitations", err));
@@ -48,19 +76,39 @@ const PortalSolicitations = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
       <header className="bg-primary text-primary-foreground p-4 shadow-md">
-        <div className="container mx-auto">
-          <Link to="/portal">
+        <div className="container mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">Minhas Solicitações</h1>
+            <p className="text-sm opacity-90">Acompanhe o status das suas solicitações</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link to="/solicitacao">
+              <Button variant="secondary" className="gap-2 shadow-sm hover:shadow-md transition-all">
+                <FileText className="w-4 h-4" />
+                Nova Solicitação
+              </Button>
+            </Link>
+            {user && ["AGENTE", "OPERADOR", "ADMIN"].includes(user.perfil) && (
+              <Link to={getServerAreaPath(user.perfil)}>
+                <Button
+                  variant="secondary"
+                  className="gap-2 shadow-sm hover:shadow-md transition-all"
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  Área do Servidor
+                </Button>
+              </Link>
+            )}
             <Button
               variant="ghost"
-              size="sm"
-              className="text-primary-foreground hover:bg-primary/90 mb-2"
+              size="icon"
+              className="text-primary-foreground hover:bg-primary-foreground/10"
+              onClick={handleLogout}
+              title="Sair"
             >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Voltar
+              <LogOut className="w-5 h-5" />
             </Button>
-          </Link>
-          <h1 className="text-2xl font-bold">Minhas Solicitações</h1>
-          <p className="text-sm opacity-90">Acompanhe o status das suas solicitações</p>
+          </div>
         </div>
       </header>
 
@@ -68,8 +116,6 @@ const PortalSolicitations = () => {
         <div className="space-y-4">
           {mySolicitations.map((solicitation) => {
             const statusConfig = getStatusConfig(solicitation.status!);
-            const solicitationNumber = `SOL-${new Date(solicitation.data).getFullYear()}-${String(solicitation.id).padStart(3, "0")}`;
-            
             return (
               <Card key={solicitation.id} className="animate-fade-in">
                 <CardHeader>
@@ -77,11 +123,8 @@ const PortalSolicitations = () => {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <FileText className="w-5 h-5 text-primary" />
-                        <span className="font-mono text-sm text-muted-foreground">
-                          {solicitationNumber}
-                        </span>
+                        <CardTitle className="text-lg">{solicitation.assunto}</CardTitle>
                       </div>
-                      <CardTitle className="text-lg">{solicitation.assunto}</CardTitle>
                     </div>
                     <Badge className={statusConfig.className}>
                       {statusConfig.label}
@@ -108,12 +151,6 @@ const PortalSolicitations = () => {
                           </DialogTitle>
                         </DialogHeader>
                         <div className="space-y-4">
-                          <div>
-                            <p className="text-sm font-semibold text-muted-foreground mb-1">Número da Solicitação</p>
-                            <p className="font-mono">
-                              {selectedSolicitation && `SOL-${new Date(selectedSolicitation.data).getFullYear()}-${String(selectedSolicitation.id).padStart(3, "0")}`}
-                            </p>
-                          </div>
                           <div>
                             <p className="text-sm font-semibold text-muted-foreground mb-1">Status</p>
                             {selectedSolicitation && (
@@ -152,13 +189,7 @@ const PortalSolicitations = () => {
               <CardContent className="text-center py-12">
                 <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                 <p className="text-muted-foreground mb-2">Você ainda não possui solicitações</p>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Não possui cadastro?{" "}
-                  <Link to="/signup" className="text-primary hover:underline font-semibold">
-                    Cadastre-se aqui
-                  </Link>
-                </p>
-                <Link to="/portal">
+                <Link to="/solicitacao">
                   <Button className="mt-4">
                     Enviar Nova Solicitação
                   </Button>
@@ -179,4 +210,4 @@ const PortalSolicitations = () => {
   );
 };
 
-export default PortalSolicitations;
+export default Portal;

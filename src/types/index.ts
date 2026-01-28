@@ -4,15 +4,14 @@
  */
 
 export enum UsuarioPerfil {
-  CIDADAO = 'ROLE_CIDADAO',
-  OPERADOR = 'ROLE_OPERADOR',
-  AGENTE = 'ROLE_AGENTE',
-  ADMIN = 'ROLE_ADMIN'
+  CIDADAO = 'CIDADAO',
+  OPERADOR = 'OPERADOR',
+  AGENTE = 'AGENTE',
+  ADMIN = 'ADMIN'
 }
 
 export enum SolicitacaoStatus {
   ABERTA = 'ABERTA',
-  EM_ANALISE = 'EM_ANALISE',
   EM_ANDAMENTO = 'EM_ANDAMENTO',
   CONCLUIDA = 'CONCLUIDA',
   ENCERRADA = 'ENCERRADA',
@@ -21,8 +20,9 @@ export enum SolicitacaoStatus {
 
 export enum SolicitacaoTipo {
   BURACO = 'BURACO',
+  ESGOTO = 'ESGOTO',
   ILUMINACAO = 'ILUMINACAO',
-  LIXO = 'LIXO',
+  LIMPEZA = 'LIMPEZA',
   OUTROS = 'OUTROS'
 }
 
@@ -55,6 +55,8 @@ export interface Endereco {
   bairro: string;
   referencia?: string;
 }
+
+export type EnderecoCreateDTO = Omit<Endereco, 'id'>;
 
 export interface Solicitacao {
   id: number;

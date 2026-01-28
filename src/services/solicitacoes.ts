@@ -11,16 +11,16 @@ export type SolicitacaoCreateDTO = {
 
 export type SolicitacaoResponse = Solicitacao;
 
-export const getSolicitacoes = (): Promise<SolicitacaoResponse[]> => 
-  apiFetch("/api/solicitacoes");
+export const getSolicitacoes = (): Promise<SolicitacaoResponse[]> =>
+  apiFetch("/api/solicitacoes/");
 
 export const createSolicitacao = (dto: SolicitacaoCreateDTO): Promise<SolicitacaoResponse> =>
-  apiFetch("/api/solicitacoes", {
+  apiFetch("/api/solicitacoes/", {
     method: "POST",
     body: JSON.stringify(dto),
   });
 
-export const getSolicitacaoById = (id: number): Promise<SolicitacaoResponse> => 
+export const getSolicitacaoById = (id: number): Promise<SolicitacaoResponse> =>
   apiFetch(`/api/solicitacoes/${id}`);
 
 export const updateSolicitacao = (id: number, dto: Partial<SolicitacaoCreateDTO>): Promise<SolicitacaoResponse> =>

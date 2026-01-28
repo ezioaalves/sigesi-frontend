@@ -1,29 +1,23 @@
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building2 } from "lucide-react";
-import { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useUser } from "@/hooks/use-user";
+import { useEffect } from "react";
 
 const Auth = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const role = searchParams.get("role");
+  const { data: user, isLoading } = useUser();
+
+  useEffect(() => {
+    if (user && !isLoading) {
+      navigate("/portal");
+    }
+  }, [user, isLoading, navigate]);
 
   const handleLogin = () => {
     // Redireciona via proxy para evitar problemas de CORS e garantir compartilhamento de cookies
     window.location.href = '/oauth2/authorization/google';
-  };
-
-  const getTitle = () => {
-    if (role === "agent") return "Interface do Agente";
-    return "Sistema Operacional";
-  };
-
-  const getDescription = () => {
-    if (role === "agent") return "Acesso para agentes de campo";
-    return "Acesso para operadores e administradores";
   };
 
   return (
@@ -32,10 +26,6 @@ const Auth = () => {
         <CardHeader className="text-center">
           <Building2 className="w-12 h-12 mx-auto text-primary mb-4" />
           <CardTitle className="text-2xl">SIGESI</CardTitle>
-          <CardDescription className="text-base">
-            {getTitle()}
-          </CardDescription>
-          <p className="text-sm text-muted-foreground">{getDescription()}</p>
         </CardHeader>
         <CardContent>
           <div className="space-y-4 text-center">
@@ -44,14 +34,6 @@ const Auth = () => {
             </p>
             <Button onClick={handleLogin} className="w-full" size="lg">
               Entrar com Google
-            </Button>
-            <Button
-              type="button"
-              variant="link"
-              onClick={() => navigate("/")}
-              className="text-sm"
-            >
-              Voltar ao início
             </Button>
           </div>
         </CardContent>

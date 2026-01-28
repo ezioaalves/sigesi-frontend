@@ -9,11 +9,12 @@ import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { createSolicitacao } from "@/services/solicitacoes";
+import { createEndereco } from "@/services/enderecos";
 import { apiFetch } from "@/lib/api";
 
 // OAuth popup helper is defined inside the component so it can use hooks like `useToast`.
 
-const Portal = () => {
+const Solicitacao = () => {
   const { toast } = useToast();
   const BACKEND_OAUTH_PATH = import.meta.env.VITE_API_BASE
     ? `${import.meta.env.VITE_API_BASE}/oauth2/authorization/google`
@@ -73,7 +74,10 @@ const Portal = () => {
     title: "",
     category: "",
     description: "",
-    address: "",
+    logradouro: "",
+    numero: "",
+    bairro: "",
+    referencia: "",
   });
   const [submitting, setSubmitting] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
@@ -101,12 +105,23 @@ const Portal = () => {
     e.preventDefault();
     setSubmitting(true);
     try {
+      // 1. Create Address first
+      const enderecoDto = {
+        logradouro: formData.logradouro,
+        numero: formData.numero,
+        bairro: formData.bairro,
+        referencia: formData.referencia,
+      };
+
+      const enderecoCriado = await createEndereco(enderecoDto);
+
+      // 2. Create Solicitation with the new Address ID
       const dto = {
         assunto: formData.title,
         body: formData.description,
         anexoId: null,
         autorId: user?.id, // Real authenticated user id
-        localId: 1, // TODO: map address to an existing local id
+        localId: enderecoCriado.id,
       };
 
       console.debug("createSolicitacao dto:", dto);
@@ -116,7 +131,15 @@ const Portal = () => {
         title: "Solicitação enviada com sucesso!",
         description: "Você receberá atualizações sobre o andamento da sua solicitação.",
       });
-      setFormData({ title: "", category: "", description: "", address: "" });
+      setFormData({
+        title: "",
+        category: "",
+        description: "",
+        logradouro: "",
+        numero: "",
+        bairro: "",
+        referencia: ""
+      });
       setFiles([]);
     } catch (err: any) {
       toast({
@@ -158,15 +181,12 @@ const Portal = () => {
             <h1 className="text-2xl font-bold">Portal do Cidadão</h1>
             <p className="text-sm opacity-90">SEINFRA - Sistema de Solicitações</p>
           </div>
-          <Link to="/portal/solicitations">
+          <Link to="/portal">
             <Button variant="secondary" size="sm" className="gap-2">
               <User className="w-4 h-4" />
               Minhas Solicitações
             </Button>
           </Link>
-          <Button variant="ghost" size="sm" onClick={loginWithPopup} className="ml-2">
-            Entrar (Google)
-          </Button>
         </div>
       </header>
 
@@ -225,46 +245,97 @@ const Portal = () => {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="address">Endereço/Local</Label>
-                <Input
-                  id="address"
-                  placeholder="Rua, número, bairro..."
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  required
-                />
+              <div className="space-y-4 border p-4 rounded-md bg-muted/20">
+                <Label className="text-lg font-semibold">Endereço do Local</Label>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="logradouro">Logradouro (Rua, Av, etc)</Label>
+                    <Input
+                      id="logradouro"
+                      placeholder="Ex: Rua das Flores"
+                      value={formData.logradouro}
+                      onChange={(e) => setFormData({ ...formData, logradouro: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="numero">Número</Label>
+                    <Input
+                      id="numero"
+                      placeholder="Ex: 123"
+                      value={formData.numero}
+                      onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="bairro">Bairro</Label>
+                  <Input
+                    id="bairro"
+                    placeholder="Ex: Centro"
+                    value={formData.bairro}
+                    onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="referencia">Ponto de Referência (Opcional)</Label>
+                  <Input
+                    id="referencia"
+                    placeholder="Ex: Próximo ao mercado..."
+                    value={formData.referencia}
+                    onChange={(e) => setFormData({ ...formData, referencia: e.target.value })}
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
                 <Label>Anexar Arquivos (Opcional)</Label>
                 <p className="text-xs text-muted-foreground">Máximo 5MB por arquivo, até 10 arquivos</p>
-                <div className="space-y-2">
+
+                <div className="grid gap-2">
                   {files.map((file, index) => (
-                    <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded-md">
+                    <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded-md border">
                       <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                       <span className="text-sm flex-1 truncate">{file.name}</span>
                       <span className="text-xs text-muted-foreground whitespace-nowrap">{(file.size / 1024).toFixed(1)}KB</span>
                       <Button
                         type="button"
                         variant="ghost"
-                        size="sm"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
                         onClick={() => removeFile(index)}
-                        className="flex-shrink-0"
                       >
                         <X className="w-4 h-4" />
                       </Button>
                     </div>
                   ))}
-                  {files.length < 10 && (
+                </div>
+
+                {files.length < 10 && (
+                  <div className="flex items-center gap-2">
                     <Input
                       type="file"
+                      id="file-upload"
+                      className="hidden"
                       onChange={handleFileChange}
-                      className="cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
                       accept="image/*,.pdf,.doc,.docx"
+                      multiple
                     />
-                  )}
-                </div>
+                    <Label
+                      htmlFor="file-upload"
+                      className="flex items-center gap-2 cursor-pointer bg-secondary text-secondary-foreground hover:bg-secondary/80 h-10 px-4 py-2 rounded-md text-sm font-medium transition-colors w-full justify-center border border-dashed border-primary/20 hover:border-primary"
+                    >
+                      <Upload className="w-4 h-4" />
+                      Selecionar Arquivos
+                    </Label>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-3 pt-4">
@@ -280,13 +351,9 @@ const Portal = () => {
             </form>
           </CardContent>
         </Card>
-
-        <div className="mt-6 text-center text-sm text-muted-foreground">
-          <p>Suas informações são protegidas pela Lei Geral de Proteção de Dados (LGPD)</p>
-        </div>
       </div>
     </div>
   );
 };
 
-export default Portal;
+export default Solicitacao;

@@ -13,7 +13,8 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useUser } from "@/hooks/use-user";
+import { logoutUser } from "@/services/usuarios";
 
 const operatorItems = [
   { title: "Dashboard", url: "/dashboard", icon: Home },
@@ -28,15 +29,21 @@ const adminItems = [
 ];
 
 export function AppSidebar() {
-  const navigate = useNavigate();
-  // In a real app, this would come from auth context
-  const [userRole] = useState<'admin' | 'operator'>('admin');
-  
-  const items = userRole === 'admin' ? adminItems : operatorItems;
+  const { data: user } = useUser();
+  const userRole = user?.perfil || 'CIDADAO';
 
-  const handleLogout = () => {
-    // In a real app, this would clear auth state
-    navigate('/');
+  // Show admin items for ADMIN, operator items for OPERADOR
+  // Adjust logic as needed. If AGENTE needs specific items, add here.
+  const items = userRole === 'ADMIN' ? adminItems : operatorItems;
+
+  const handleLogout = async () => {
+    try {
+      await logoutUser();
+      // Force refresh or redirect
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Logout failed", error);
+    }
   };
 
   return (
@@ -45,7 +52,7 @@ export function AppSidebar() {
         <h2 className="text-lg font-bold text-sidebar-foreground">SIGESI</h2>
         <p className="text-xs text-sidebar-foreground/70">Sistema Operacional</p>
       </SidebarHeader>
-      
+
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Navegação</SidebarGroupLabel>

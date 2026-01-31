@@ -1,9 +1,35 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Users, Smartphone } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Building2, Users, Loader2 } from "lucide-react";
+import { useEffect } from "react";
+import { useUser } from "@/hooks/use-user";
+import { useNavigate } from "react-router-dom";
 
 const Index = () => {
+  const { data: user, isLoading } = useUser();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (user && !isLoading) {
+      navigate("/portal");
+    }
+  }, [user, isLoading, navigate]);
+
+  const handleLogin = () => {
+    window.location.href = '/oauth2/authorization/google';
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto" />
+          <p className="text-muted-foreground animate-pulse">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
       <div className="container mx-auto px-4 py-16">
@@ -14,49 +40,20 @@ const Index = () => {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-          <Card className="hover:shadow-lg transition-shadow animate-fade-in">
+        <div className="max-w-md mx-auto animate-fade-in">
+          <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
-              <Building2 className="w-12 h-12 text-primary mb-4" />
-              <CardTitle>Sistema Operacional</CardTitle>
-              <CardDescription>
-                Interface para operadores e administradores
+              <Building2 className="w-12 h-12 text-primary mb-4 mx-auto" />
+              <CardTitle className="text-center">Acesso ao Sistema</CardTitle>
+              <CardDescription className="text-center">
+                Faça login com sua conta institucional ou pessoal
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Link to="/auth?role=operator">
-                <Button className="w-full">Acessar Sistema</Button>
-              </Link>
-            </CardContent>
-          </Card>
-
-          <Card className="hover:shadow-lg transition-shadow animate-fade-in [animation-delay:100ms]">
-            <CardHeader>
-              <Smartphone className="w-12 h-12 text-accent mb-4" />
-              <CardTitle>Interface Agente</CardTitle>
-              <CardDescription>
-                Acesso simplificado para agentes em campo
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link to="/auth?role=agent">
-                <Button variant="outline" className="w-full">Acessar Interface</Button>
-              </Link>
-            </CardContent>
-          </Card>
-
-          <Card className="hover:shadow-lg transition-shadow animate-fade-in [animation-delay:200ms]">
-            <CardHeader>
-              <Users className="w-12 h-12 text-success mb-4" />
-              <CardTitle>Portal do Cidadão</CardTitle>
-              <CardDescription>
-                Portal público para envio de solicitações
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link to="/portal">
-                <Button variant="secondary" className="w-full">Acessar Portal</Button>
-              </Link>
+              <Button className="w-full gap-2" size="lg" onClick={handleLogin}>
+                <Users className="w-5 h-5" />
+                Entrar com Google
+              </Button>
             </CardContent>
           </Card>
         </div>

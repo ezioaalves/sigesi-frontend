@@ -10,8 +10,10 @@ import Cemetery from "./pages/Cemetery";
 import Users from "./pages/Users";
 import Agent from "./pages/Agent";
 import Solicitation from "./pages/Solicitation";
+import ProtectedRoute from "./components/ProtectedRoute";
+import Index from "./pages/Index";
 import Portal from "./pages/Portal";
-import Auth from "./pages/Auth";
+// import Auth from "./pages/Auth"; // Deleted
 import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
 
@@ -24,15 +26,52 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Auth />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/documentos" element={<Documents />} />
-          <Route path="/demandas" element={<Demands />} />
-          <Route path="/cemeterio" element={<Cemetery />} />
-          <Route path="/usuarios" element={<Users />} />
-          <Route path="/agente" element={<Agent />} />
-          <Route path="/portal" element={<Portal />} />
-          <Route path="/solicitacao" element={<Solicitation />} />
+          <Route path="/" element={<Index />} />
+
+          {/* Protected Routes for any authenticated user */}
+          <Route path="/portal" element={
+            <ProtectedRoute>
+              <Portal />
+            </ProtectedRoute>
+          } />
+          <Route path="/solicitacao" element={
+            <ProtectedRoute>
+              <Solicitation />
+            </ProtectedRoute>
+          } />
+          <Route path="/documentos" element={
+            <ProtectedRoute>
+              <Documents />
+            </ProtectedRoute>
+          } />
+
+          {/* Role-Based Protected Routes */}
+          <Route path="/dashboard" element={
+            <ProtectedRoute allowedRoles={['AGENTE', 'OPERADOR', 'ADMIN']}>
+              <Dashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/demandas" element={
+            <ProtectedRoute allowedRoles={['AGENTE', 'OPERADOR', 'ADMIN']}>
+              <Demands />
+            </ProtectedRoute>
+          } />
+          <Route path="/cemeterio" element={
+            <ProtectedRoute allowedRoles={['OPERADOR', 'ADMIN']}>
+              <Cemetery />
+            </ProtectedRoute>
+          } />
+          <Route path="/usuarios" element={
+            <ProtectedRoute allowedRoles={['ADMIN']}>
+              <Users />
+            </ProtectedRoute>
+          } />
+          <Route path="/agente" element={
+            <ProtectedRoute allowedRoles={['AGENTE', 'OPERADOR', 'ADMIN']}>
+              <Agent />
+            </ProtectedRoute>
+          } />
+
           <Route path="/signup" element={<Signup />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

@@ -67,13 +67,48 @@ export interface Solicitacao {
   data: string; // ISO DateTime
   local: Endereco;
   autor?: Usuario;
-  anexo?: any;
+  anexo?: unknown;
 }
 
 export interface Demanda {
   id: number;
-  solicitacaoId: number;
+  solicitacao: Solicitacao;
+  responsavel?: Usuario;
+  prazo: string; // ISO Date
   status: DemandaStatus;
-  prioridade: DemandaPrioridade;
-  agenteId?: number;
+  materiais: Material[];
+}
+
+export interface DemandaCreateDTO {
+  solicitacaoId: number;
+  responsavelId?: number;
+  prazo: string;
+  materiaisIds: number[];
+}
+
+export interface DemandaUpdateDTO {
+  responsavelId?: number;
+  prazo?: string;
+  status?: DemandaStatus;
+  materiaisIds?: number[];
+}
+
+export interface Material {
+  id: number;
+  nome: string;
+  quantidade: number;
+  preco: number;
+}
+
+export interface Comentario {
+  id: number;
+  demandaId: number;
+  autor: Usuario;
+  texto: string;
+  criadoEm: string; // ISO DateTime
+}
+
+export interface ComentarioCreateDTO {
+  demandaId: number;
+  texto: string;
 }

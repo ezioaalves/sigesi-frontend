@@ -12,6 +12,11 @@ export const getCurrentUser = async (): Promise<Usuario> => {
         ativo: true // Default or missing from this endpoint
     } as Usuario;
 };
+
+export const getAllUsers = async (): Promise<Usuario[]> => {
+    return await apiFetch("/api/usuarios/");
+};
+
 export const logoutUser = async (): Promise<void> => {
     await apiFetch("/logout", { method: "POST" });
 };
